@@ -32,6 +32,13 @@ public class MyCallback implements Callback {
     public void receive(String message) {
         logger.debug("Message received: {} by {}", message, Thread.currentThread().getName() + ":" + Thread.currentThread().getId());
 
+        // Simulate some processing, that takes long than expected
+        if (message != null && message.contains("#STAAAP#")) {
+            try {
+                Thread.sleep(60000L);
+            } catch (InterruptedException e) {
+            }
+        }
         EntityTransaction trn = null;
         try {
             Message entity = new Message();

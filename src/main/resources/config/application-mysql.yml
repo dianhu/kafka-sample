@@ -24,3 +24,4 @@ broker:
         commit-before-processing: false
         max-poll-records: 50
         pause-for-processing: true
+        heartbeat-interval: 3000

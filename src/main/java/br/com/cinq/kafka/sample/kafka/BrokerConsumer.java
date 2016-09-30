@@ -99,7 +99,9 @@ public class BrokerConsumer implements Consumer, DisposableBean, InitializingBea
     // Since 0.10.x
     @Value("${broker.consumer.max-poll-records:1}")
     private int maxPollRecords;
-
+    
+    @Value("${broker.consumer.heartbeat-interval:3000}")
+    private int heartbeatInterval;
 
     private Callback callback;
 
@@ -154,6 +156,7 @@ public class BrokerConsumer implements Consumer, DisposableBean, InitializingBea
         props.put("receive.buffer.bytes", getReceiveBufferBytes());
         props.put("auto.offset.reset", "latest"); // end
         props.put("max.poll.records", getMaxPollRecords());
+        props.put("heartbeat.interval.ms", getHeartbeatInterval());
 
         for (int i = 0; i < getPartitions(); i++) {
             // Initialize client
@@ -321,5 +324,13 @@ public class BrokerConsumer implements Consumer, DisposableBean, InitializingBea
 
     public void setPauseForProcessing(boolean pauseForProcessing) {
         this.pauseForProcessing = pauseForProcessing;
+    }
+
+    public int getHeartbeatInterval() {
+        return heartbeatInterval;
+    }
+
+    public void setHeartbeatInterval(int heartbeatInterval) {
+        this.heartbeatInterval = heartbeatInterval;
     }
 }
