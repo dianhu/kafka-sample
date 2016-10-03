@@ -21,7 +21,7 @@ broker:
         batch-size: 16384
     consumer:
         bootstrapServer: localhost:9092
-        commit-before-processing: false
+        commit-before-processing: true
         max-poll-records: 50
         pause-for-processing: true
         heartbeat-interval: 3000

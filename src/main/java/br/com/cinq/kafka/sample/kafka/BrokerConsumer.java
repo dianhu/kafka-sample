@@ -6,6 +6,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -102,7 +104,11 @@ public class BrokerConsumer implements Consumer, DisposableBean, InitializingBea
     
     @Value("${broker.consumer.heartbeat-interval:3000}")
     private int heartbeatInterval;
+    
+    /** Thread pool to call polling() on paused queues */ 
+    ExecutorService workers = null;
 
+    /** Callback class to perform processing */
     private Callback callback;
 
     /** List of consumers */
@@ -158,8 +164,10 @@ public class BrokerConsumer implements Consumer, DisposableBean, InitializingBea
         props.put("max.poll.records", getMaxPollRecords());
         props.put("heartbeat.interval.ms", getHeartbeatInterval());
 
+        workers = Executors.newFixedThreadPool(getPartitions());
+
         for (int i = 0; i < getPartitions(); i++) {
-            // Initialize client
+            // Initialise client
             BrokerConsumerClient client = new BrokerConsumerClient();
 
             client.setEnableAutoCommit(getEnableAutoCommit());
@@ -168,6 +176,7 @@ public class BrokerConsumer implements Consumer, DisposableBean, InitializingBea
             client.setCommitBeforeProcessing(getCommitBeforeProcessing());
             client.setProperties(props);
             client.setPauseForProcessing(isPauseForProcessing());
+            client.setWorkers(workers);
             if (callback == null) {
                 client.setCallback(context.getBean(Callback.class));
                 logger.debug(client.getCallback().toString());

@@ -3,10 +3,12 @@ package br.com.cinq.kafka.sample.kafka;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.consumer.CommitFailedException;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
@@ -40,6 +42,8 @@ public class BrokerConsumerClient implements Runnable, ConsumerRebalanceListener
     private boolean commitBeforeProcessing;
 
     private boolean pauseForProcessing;
+
+    private ExecutorService workers;
 
     @Override
     public void run() {
@@ -85,7 +89,28 @@ public class BrokerConsumerClient implements Runnable, ConsumerRebalanceListener
                         count++;
 
                         // Process
-                        callback.receive(record.value());
+                        Future<Boolean> future = workers.submit(() -> {
+                            callback.receive(record.value());
+                            return true;
+                        });
+
+                        // Pause for processing enables to call polling for heartbeats and heavy processing
+                        if (isPauseForProcessing()) {
+                            try {
+                                while (true) {
+                                    try {
+                                        if (future.get(1, TimeUnit.SECONDS) != null) {
+                                            break;
+                                        }
+                                    } catch (java.util.concurrent.TimeoutException e) {
+                                        ConsumerRecords<String, String> pollingForHeartbeat = getConsumer().poll(0);
+                                        logger.debug("Polling while paused {}", pollingForHeartbeat != null ? pollingForHeartbeat.count() : -1);
+                                    }
+                                }
+                            } catch (InterruptedException | ExecutionException e) {
+                                logger.warn("Something went wrong while polling for Hearbeats", e);
+                            }
+                        }
 
                         // Save Offsets
                         BrokerConsumer.getOffsets()
@@ -94,7 +119,7 @@ public class BrokerConsumerClient implements Runnable, ConsumerRebalanceListener
 
                     // Resume
                     if (isPauseForProcessing()) {
-                        logger.debug("Queue paused");
+                        logger.debug("Queue resumed");
                         getConsumer().resume(partitions);
                     }
 
@@ -133,6 +158,14 @@ public class BrokerConsumerClient implements Runnable, ConsumerRebalanceListener
             logger.warn("Wake up exception", e);
         } catch (RebalanceInProgressException e) {
             logger.warn("Rebalance In Progress", e);
+        }
+    }
+
+    private void interruptThreadForPollingWhilePaused(Thread pollingWhilePaused) {
+        pollingWhilePaused.interrupt();
+        try {
+            pollingWhilePaused.join(Integer.MAX_VALUE);
+        } catch (InterruptedException e) {
         }
     }
 
@@ -248,5 +281,13 @@ public class BrokerConsumerClient implements Runnable, ConsumerRebalanceListener
 
     public void setPauseForProcessing(boolean pauseForProcessing) {
         this.pauseForProcessing = pauseForProcessing;
+    }
+
+    public ExecutorService getWorkers() {
+        return workers;
+    }
+
+    public void setWorkers(ExecutorService workers) {
+        this.workers = workers;
     }
 }
