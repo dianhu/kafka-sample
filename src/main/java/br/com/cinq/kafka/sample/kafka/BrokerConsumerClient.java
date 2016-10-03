@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -70,13 +71,8 @@ public class BrokerConsumerClient implements Runnable, ConsumerRebalanceListener
                     }
 
                     // Pause queues
-                    List<TopicPartition> partitions = null;
+                    Set<TopicPartition> partitions = records.partitions();
                     if (isPauseForProcessing()) {
-                        partitions = new ArrayList<>();
-                        for (ConsumerRecord<String, String> record : records) {
-                            TopicPartition topic = new TopicPartition(record.topic(), record.partition());
-                            partitions.add(topic);
-                        }
                         logger.debug("Queue paused");
                         getConsumer().pause(partitions);
                     }
